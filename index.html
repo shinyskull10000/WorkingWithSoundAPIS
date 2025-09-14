@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decibel Monitor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding-top: 50px;
+      transition: background-color 0.3s;
+    }
+    #status {
+      font-size: 1.5em;
+      margin-top: 20px;
+    }
+    #startBtn {
+      padding: 10px 20px;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real-Time Decibel Monitor</h1>
+  <button id="startBtn">Start Monitoring</button>
+  <div id="status">Click "Start Monitoring" to begin</div>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const statusEl = document.getElementById('status');
+    let readings = [];
+
+    startBtn.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        startMonitoring(stream);
+        startBtn.disabled = true;
+        statusEl.textContent = "Monitoring started...";
+      } catch (err) {
+        alert('Microphone access denied or unavailable.');
+        console.error(err);
+      }
+    });
+
+    function startMonitoring(stream) {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+
+      source.connect(analyser);
+      const dataArray = new Float32Array(analyser.fftSize);
+
+      setInterval(() => {
+        analyser.getFloatTimeDomainData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i] * dataArray[i];
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+        const db = 20 * Math.log10(rms);
+
+        readings.push(db);
+        if (readings.length > 50) readings.shift();
+        const avg = readings.reduce((a, b) => a + b) / readings.length;
+
+        statusEl.textContent = `Current: ${db.toFixed(1)} dB | Avg: ${avg.toFixed(1)} dB`;
+
+        if (avg > -20) {
+          flashAlert();
+        }
+      }, 200);
+    }
+
+    function flashAlert() {
+      document.body.style.backgroundColor = 'red';
+      setTimeout(() => {
+        document.body.style.backgroundColor = '';
+      }, 300);
+    }
+  </script>
+</body>
+</html>
